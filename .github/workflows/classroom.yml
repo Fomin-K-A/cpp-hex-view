@@ -1,0 +1,35 @@
+name: Local CI
+
+on: 
+  workflow_dispatch:
+  push:
+    paths-ignore:
+      - '.github/*'
+
+jobs:
+  Build-And-Test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Get repository code
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y valgrind numdiff
+
+      - name: Build
+        run: |
+          !(grep -qwRE --include=*.{cc,cpp,h} '<vector>|<list>|<algorithm>|<stack>|<queue>|<deque>|<set>|<map>|<string>' ./* ) \
+            && echo "Build..." \
+            || (echo "Forbidden STL containers" && exit 9)
+          clang++ -pedantic-errors -std=c++17 hexview.cpp -o hexview
+
+      - name: Run Test
+        run: |
+          echo "Running hexview test..."
+          ./hexview -s 1 -n 30 tests/ex5.txt
+
+      - name: Memory leaks
+        run: |
+          valgrind --tool=memcheck --leak-check=full --undef-value-errors=no --error-exitcode=111 ./hexview -s 1 -n 30 tests/ex5.txt
